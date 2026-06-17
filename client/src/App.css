@@ -1,0 +1,63 @@
+/* client/src/App.css */
+
+/* ─── CUSTOM COMPONENT STYLES ─────────────────────────────────── */
+
+
+
+.premium-input {
+  border-radius: 4px !important;
+  border: 1px solid var(--color-base-300);
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
+}
+
+.premium-input:focus {
+  outline: none;
+  border-color: var(--color-nav-accent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--color-nav-accent), transparent 80%);
+}
+
+.premium-btn {
+  border-radius: 4px !important;
+  background-color: var(--color-nav-accent);
+  color: #ffffff;
+  font-weight: 700;
+  border: none;
+  transition: all 200ms ease;
+  cursor: pointer;
+}
+
+.premium-btn:hover {
+  background-color: color-mix(in oklab, var(--color-nav-accent), black 10%);
+  transform: translateY(-1px);
+}
+
+.premium-btn:disabled {
+  background-color: var(--color-base-300);
+  color: color-mix(in oklch, var(--color-base-content), transparent 60%);
+  cursor: not-allowed;
+}
+
+.premium-card {
+  border-radius: 8px !important;
+  border: 1px solid var(--color-base-300);
+  background-color: var(--color-base-100);
+}
+
+/* ─── ANIMATIONS ─────────────────────────────────────────────── */
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-fade-in {
+  animation: fadeSlideUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
