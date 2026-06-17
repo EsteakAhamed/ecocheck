@@ -24,19 +24,14 @@ async function getPageWeight(url) {
     const page = await browser.newPage();
     let totalBytes = 0;
 
-    // Accumulate bytes from every network response
-    page.on('response', async (response) => {
-      try {
-        const contentLength = response.headers()['content-length'];
-        if (contentLength) {
-          totalBytes += parseInt(contentLength, 10);
-        } else {
-          // Fallback: read body buffer when content-length header is absent
-          const buffer = await response.buffer().catch(() => null);
-          if (buffer) totalBytes += buffer.length;
-        }
-      } catch {
-        // Ignore failures from individual resources (ads, trackers, CORS blocks)
+    // Connect directly to the Chrome DevTools Protocol session
+    const client = await page.target().createCDPSession();
+    await client.send('Network.enable');
+
+    // Accumulate encoded wire size bytes from finished network items
+    client.on('Network.loadingFinished', (event) => {
+      if (event.encodedDataLength) {
+        totalBytes += event.encodedDataLength;
       }
     });
 
