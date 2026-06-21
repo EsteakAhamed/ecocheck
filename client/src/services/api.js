@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 60000, // 60s — Puppeteer can be slow on heavy pages
+  timeout: 130000, // 130s — Google PageSpeed Insights can take up to 2 minutes on heavy pages
 });
 
 /** POST /api/carbon/analyze — triggers full page audit pipeline */

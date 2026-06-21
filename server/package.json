@@ -15,7 +15,6 @@
   "keywords": [
     "carbon-footprint",
     "sustainability",
-    "puppeteer",
     "website-carbon",
     "green-hosting"
   ],
@@ -32,10 +31,6 @@
     "helmet": "^8.2.0",
     "mongodb": "^7.3.0",
     "mongoose": "^9.7.0",
-    "nodemon": "^3.1.14",
-    "puppeteer": "^25.1.0"
-  },
-  "allowScripts": {
-    "puppeteer@25.1.0": true
+    "nodemon": "^3.1.14"
   }
 }

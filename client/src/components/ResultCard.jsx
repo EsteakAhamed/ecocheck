@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
   RadialBarChart,
   RadialBar,
   PolarAngleAxis,
@@ -41,6 +42,30 @@ const GLOBAL_AVG_CO2_PER_VISIT = 0.5; // grams of CO2 for an average page view
 const GOOGLE_SEARCH_CO2 = 0.2; // grams of CO2 per search
 const PHONE_CHARGE_CO2 = 8.5; // grams of CO2 per full smartphone charge
 
+// Mirrors the grade thresholds in server/services/co2Service.js (getRating).
+// Keep these two in sync if the server's bands ever change.
+const SCALE_DOMAIN_MAX = 1; // grams — visual cap for the scale; F is open-ended past this
+const RATING_THRESHOLDS = [
+  { grade: "A+", max: 0.095 },
+  { grade: "A", max: 0.186 },
+  { grade: "B", max: 0.341 },
+  { grade: "C", max: 0.493 },
+  { grade: "D", max: 0.656 },
+  { grade: "E", max: 0.846 },
+  { grade: "F", max: SCALE_DOMAIN_MAX },
+];
+
+// Colors for the resource-type composition chart.
+const TYPE_COLORS = {
+  script: "#f59e0b",
+  image: "#3b82f6",
+  stylesheet: "#a855f7",
+  font: "#ec4899",
+  document: "#10b981",
+  media: "#06b6d4",
+  other: "#9ca3af",
+};
+
 // Reads the live theme accent from CSS so the chart/gauge colors always
 // match whatever --nav-accent currently resolves to (light/dark/eco theme).
 const getAccentHex = () => {
@@ -66,13 +91,36 @@ const ChartTooltip = ({ active, payload }) => {
   );
 };
 
+const BreakdownTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const item = payload[0];
+  return (
+    <div className="bg-base-100 border-2 border-base-content/30 px-3 py-2">
+      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-base-content/60 mb-1">
+        {item.payload.label}
+      </p>
+      <p className="text-sm font-black text-base-content">
+        {formatSize(item.value)}
+      </p>
+    </div>
+  );
+};
+
 const ResultCard = ({ result }) => {
   const [copied, setCopied] = useState(false);
 
   if (!result) return null;
 
-  const { url, bytes, green, hostedBy, co2PerVisit, rating, annualCO2Kg } =
-    result;
+  const {
+    url,
+    bytes,
+    green,
+    hostedBy,
+    co2PerVisit,
+    rating,
+    annualCO2Kg,
+    breakdown,
+  } = result;
   const displayUrl = url.replace(/\/$/, "").replace(/^https?:\/\//, "");
   const co2Val = co2PerVisit || 0;
   const accentHex = getAccentHex();
@@ -155,10 +203,59 @@ const ResultCard = ({ result }) => {
     },
   ];
 
+  // ── Emission Scale (A+ → F band strip) ─────────────────────
+  const getBandVisual = (grade) => {
+    if (grade === "A+" || grade === "A") {
+      return { hex: accentHex, textClass: "text-[var(--color-primary-content,#1a1a1a)]" };
+    }
+    if (grade === "B" || grade === "C") {
+      return { hex: "#facc15", textClass: "text-black" };
+    }
+    return { hex: "#ef4444", textClass: "text-white" };
+  };
+
+  const scaleBands = RATING_THRESHOLDS.map((band, idx) => {
+    const prevMax = idx === 0 ? 0 : RATING_THRESHOLDS[idx - 1].max;
+    const widthPercent = ((band.max - prevMax) / SCALE_DOMAIN_MAX) * 100;
+    return { ...band, widthPercent };
+  });
+
+  const markerPercent = Math.min(
+    Math.max((co2Val / SCALE_DOMAIN_MAX) * 100, 3),
+    97,
+  );
+
+  const currentBandIndex = RATING_THRESHOLDS.findIndex(
+    (b) => b.grade === rating,
+  );
+  const nextGrade =
+    currentBandIndex > 0 ? RATING_THRESHOLDS[currentBandIndex - 1].grade : null;
+  const nextGradeMax =
+    currentBandIndex > 0 ? RATING_THRESHOLDS[currentBandIndex - 1].max : null;
+  const gapToNextGrade =
+    nextGradeMax !== null ? Math.max(0, co2Val - nextGradeMax) : 0;
+
+  // Same annualization assumption already used server-side (10,000 monthly visits × 12).
+  const headroomToAPlus = Math.max(0, co2Val - RATING_THRESHOLDS[0].max);
+  const headroomAnnualKg = ((headroomToAPlus * 10000 * 12) / 1000).toFixed(2);
+
+  // ── Composition Breakdown (by resource type) ────────────────
+  const breakdownTotal = (breakdown || []).reduce(
+    (sum, item) => sum + item.bytes,
+    0,
+  );
+  const breakdownData = (breakdown || []).map((item) => ({
+    type: item.type,
+    label: item.label,
+    bytes: item.bytes,
+    fill: TYPE_COLORS[item.type] || TYPE_COLORS.other,
+    percentLabel:
+      breakdownTotal > 0 ? `${Math.round((item.bytes / breakdownTotal) * 100)}%` : "",
+  }));
+
   const handleCopy = () => {
-    const summary = `${displayUrl} emits ~${co2Val.toFixed(2)}g CO₂ per page load (Rating: ${
-      rating || "N/A"
-    }). Checked with EcoCheck.`;
+    const summary = `${displayUrl} emits ~${co2Val.toFixed(2)}g CO₂ per page load (Rating: ${rating || "N/A"
+      }). Checked with EcoCheck.`;
     navigator.clipboard?.writeText(summary);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -209,29 +306,29 @@ const ResultCard = ({ result }) => {
 
           <div className="mt-8 flex items-center gap-2">
             <div className="relative w-32 h-32 flex-shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                  innerRadius="70%"
-                  outerRadius="100%"
-                  data={gaugeData}
-                  startAngle={90}
-                  endAngle={-270}
-                >
-                  <PolarAngleAxis
-                    type="number"
-                    domain={[0, RATING_CEILING]}
-                    angleAxisId={0}
-                    tick={false}
-                  />
-                  <RadialBar
-                    background={{ fill: "rgba(128,128,128,0.15)" }}
-                    dataKey="value"
-                    cornerRadius={0}
-                    animationDuration={900}
-                    animationEasing="ease-out"
-                  />
-                </RadialBarChart>
-              </ResponsiveContainer>
+              <RadialBarChart
+                width={128}
+                height={128}
+                innerRadius="70%"
+                outerRadius="100%"
+                data={gaugeData}
+                startAngle={90}
+                endAngle={-270}
+              >
+                <PolarAngleAxis
+                  type="number"
+                  domain={[0, RATING_CEILING]}
+                  angleAxisId={0}
+                  tick={false}
+                />
+                <RadialBar
+                  background={{ fill: "rgba(128,128,128,0.15)" }}
+                  dataKey="value"
+                  cornerRadius={0}
+                  animationDuration={900}
+                  animationEasing="ease-out"
+                />
+              </RadialBarChart>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-4xl font-black text-base-content">
                   {rating || "?"}
@@ -335,9 +432,8 @@ const ResultCard = ({ result }) => {
             Vs. Global Average Page Load
           </span>
           <span
-            className={`text-sm font-black uppercase tracking-tight ${
-              isCleaner ? "text-[var(--nav-accent)]" : "text-red-500"
-            }`}
+            className={`text-sm font-black uppercase tracking-tight ${isCleaner ? "text-[var(--nav-accent)]" : "text-red-500"
+              }`}
           >
             {isCleaner
               ? `${diffPercent}% cleaner`
@@ -347,7 +443,14 @@ const ResultCard = ({ result }) => {
         </div>
 
         <div className="w-full h-[180px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minWidth={1}
+            minHeight={1}
+            initialDimension={{ width: 1, height: 1 }}
+            debounce={50}
+          >
             <BarChart
               data={barData}
               layout="vertical"
@@ -386,6 +489,147 @@ const ResultCard = ({ result }) => {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* ── EMISSION SCALE ──────────────────────────────────────── */}
+      <div className="border-2 border-t-0 border-base-content/20 bg-base-100 p-6 sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-base-content/50">
+            Emission Scale
+          </span>
+          {nextGrade && (
+            <span className="text-sm font-black uppercase tracking-tight text-base-content/70">
+              {gapToNextGrade.toFixed(3)}g from {nextGrade} rating
+            </span>
+          )}
+        </div>
+
+        <div className="relative pt-9">
+          <div
+            className="absolute top-0 flex flex-col items-center"
+            style={{ left: `${markerPercent}%`, transform: "translateX(-50%)" }}
+          >
+            <span className="text-[10px] font-black uppercase tracking-wider text-base-content whitespace-nowrap mb-1">
+              You · {co2Val.toFixed(3)}g
+            </span>
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: "6px solid transparent",
+                borderRight: "6px solid transparent",
+                borderTop: `8px solid ${gradeTheme.hex}`,
+              }}
+            />
+          </div>
+
+          <div className="flex h-8 border border-base-content/20 overflow-hidden">
+            {scaleBands.map((band) => {
+              const visual = getBandVisual(band.grade);
+              const active = band.grade === rating;
+              return (
+                <div
+                  key={band.grade}
+                  className={`flex items-center justify-center text-[10px] font-black uppercase border-r border-base-content/10 last:border-r-0 transition-colors duration-500 ${active ? visual.textClass : "text-base-content/30"
+                    }`}
+                  style={{
+                    width: `${band.widthPercent}%`,
+                    backgroundColor: active ? visual.hex : "transparent",
+                  }}
+                >
+                  {band.grade}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {headroomToAPlus > 0 && (
+          <p className="text-xs font-medium text-base-content/60 mt-4 leading-relaxed">
+            Trimming this page to A+ efficiency (0.095g/visit) would cut emissions by{" "}
+            <span className="font-black text-base-content">
+              {headroomToAPlus.toFixed(3)}g per visit.
+            </span>{" "}
+            roughly{" "}
+            <span className="font-black text-base-content">
+              {headroomAnnualKg} kg/year
+            </span>{" "}
+            at current traffic assumptions.
+          </p>
+        )}
+      </div>
+
+      {/* ── COMPOSITION BREAKDOWN ───────────────────────────────── */}
+      {breakdownData.length > 0 && (
+        <div className="border-2 border-t-0 border-base-content/20 bg-base-100 p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-base-content/50">
+              Composition Breakdown
+            </span>
+            <span className="text-[10px] font-medium text-base-content/40 uppercase tracking-wider">
+              By resource type
+            </span>
+          </div>
+
+          <div
+            className="w-full"
+            style={{ height: Math.max(breakdownData.length * 36, 120) }}
+          >
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={1}
+              minHeight={1}
+              initialDimension={{ width: 1, height: 1 }}
+              debounce={50}
+            >
+              <BarChart
+                data={breakdownData}
+                layout="vertical"
+                margin={{ top: 0, right: 50, bottom: 0, left: 0 }}
+                barCategoryGap={14}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  width={90}
+                  tick={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    fill: "var(--color-base-content, #333)",
+                  }}
+                />
+                <Tooltip
+                  content={<BreakdownTooltip />}
+                  cursor={{ fill: "rgba(128,128,128,0.08)" }}
+                />
+                <Bar
+                  dataKey="bytes"
+                  radius={0}
+                  animationDuration={800}
+                  animationEasing="ease-out"
+                  barSize={20}
+                >
+                  {breakdownData.map((entry, idx) => (
+                    <Cell key={idx} fill={entry.fill} />
+                  ))}
+                  <LabelList
+                    dataKey="percentLabel"
+                    position="right"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      fill: "var(--color-base-content, #333)",
+                    }}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* ── RELATABLE IMPACT ──────────────────────────────────── */}
       <div className="border-2 border-t-0 border-base-content/20 bg-base-200/50 p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">

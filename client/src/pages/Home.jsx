@@ -81,9 +81,14 @@ const Home = () => {
       const data = await analyzeWebsite(url);
       setResult(data);
     } catch (err) {
-      const message =
-        err.response?.data?.error ||
-        "Calculation interface interrupted. Verify the URL is public and operational.";
+      let message = "Calculation interface interrupted. Verify the URL is public and operational.";
+      
+      if (err.response?.data?.error) {
+        message = err.response.data.error;
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        message = "This page took too long to analyze — it may be unusually large or complex. Please try again later.";
+      }
+      
       setError(message);
     } finally {
       setLoading(false);

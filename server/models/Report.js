@@ -28,6 +28,7 @@ const reportSchema = new mongoose.Schema(
       type: String,
       enum: ['A+', 'A', 'B', 'C', 'D', 'E', 'F'],
     },
+    hostedBy: { type: String },
   },
   { timestamps: true }
 );

@@ -1,4 +1,3 @@
-// server/controllers/carbonController.js
 const { getPageWeight } = require('../services/pageWeightService');
 const { checkGreenHosting } = require('../services/greenHostService');
 const { calculateEmissions, getRating } = require('../services/co2Service');
@@ -36,7 +35,7 @@ const analyzeWebsite = asyncHandler(async (req, res) => {
   console.log(`[MEASURE] Measuring page weight for: ${targetUrl.href}`);
   console.log(`[GREEN_HOST] Checking green hosting for: ${targetUrl.hostname}`);
 
-  const [bytes, { green: isGreen, hostedBy }] = await Promise.all([
+  const [{ bytes, breakdown }, { green: isGreen, hostedBy }] = await Promise.all([
     getPageWeight(targetUrl.href),
     checkGreenHosting(targetUrl.hostname),
   ]);
@@ -57,6 +56,9 @@ const analyzeWebsite = asyncHandler(async (req, res) => {
     rating,
     // Annual estimate: 10,000 monthly visits × 12 months
     annualCO2Kg: parseFloat(((co2Grams * 10000 * 12) / 1000).toFixed(4)),
+    // Array of { type, label, bytes } sorted largest-first, or null if PSI
+    // didn't return usable resource-type data for this page.
+    breakdown,
   };
 
   // ── Persist (fire-and-forget — don't block the response) ──────────────
@@ -67,6 +69,10 @@ const analyzeWebsite = asyncHandler(async (req, res) => {
     green: result.green,
     co2PerVisit: result.co2PerVisit,
     rating: result.rating,
+    // NOTE: `breakdown` isn't in the Report schema yet — Mongoose will
+    // silently drop it on save until the schema is updated to include it.
+    // Send me Report.js if you want this persisted in history.
+    breakdown: result.breakdown,
   }).catch((err) => console.error('[WARN] Failed to save report:', err.message));
 
   console.log(`[SUCCESS] Analysis complete: ${co2Grams.toFixed(4)}g CO₂ (${rating})`);
