@@ -18,7 +18,7 @@ const NAV_LINKS = [
 const CONTACT_ITEMS = [
   { icon: RiPhoneLine, label: "+88 01567806918", href: "tel:+8801567806918" },
   { icon: RiMailLine, label: "info@dragondigitals.com", href: "mailto:info@dragondigitals.com" },
-  { icon: RiGlobalLine, label: "dragondigitals.com", href: "https://www.dragondigitals.com" },
+  { icon: RiGlobalLine, label: "dragondigitals.com", href: "https://dragondigitals.com/" },
   { icon: RiMapPinLine, label: "Lalmatia, Dhaka", href: null },
 ];
 
@@ -107,7 +107,7 @@ const Footer = () => {
           </p>
 
           <a
-            href="https://www.dragondigitals.com"
+            href="https://dragondigitals.com/"
             target="_blank"
             rel="noopener noreferrer"
             className="group flex items-center gap-3"
