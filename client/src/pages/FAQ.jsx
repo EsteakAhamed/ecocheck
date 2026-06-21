@@ -1,5 +1,6 @@
 // client/src/pages/FAQ.jsx
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   RiAddLine,
   RiSubtractLine,
@@ -153,15 +154,15 @@ const FAQ = () => {
           </p>
         </div>
         <div className="flex-shrink-0">
-          <a
-            href="/how-it-works"
+          <Link
+            to="/how-it-works"
             className="inline-flex items-center justify-center bg-base-300/60 hover:bg-base-300 text-base-content font-mono font-bold text-xs uppercase tracking-wider px-6 py-3.5 rounded-xl border border-base-300 shadow-sm transition-all duration-200 group gap-2"
           >
             <span>Our Methodology</span>
             <span className="transform group-hover:translate-x-1 transition-transform">
               &rarr;
             </span>
-          </a>
+          </Link>
         </div>
       </div>
 
